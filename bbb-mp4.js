@@ -7,22 +7,27 @@ var disp_num = Math.floor(Math.random() * (200 - 99) + 99);
 var xvfb = new Xvfb({
     displayNum: disp_num,
     silent: true,
-    xvfb_args: ["-screen", "0", "1280x800x24", "-ac", "-nolisten", "tcp", "-dpi", "96", "+extension", "RANDR"]
+    xvfb_args: ["-screen", "0", "1280x720x24", "-ac", "-nolisten", "tcp", "-dpi", "96", "+extension", "RANDR"]
 });
 var width = 1280;
-var height = 800;
+var height = 720;
 var options = {
     headless: false,
     args: [
-        '--disable-infobars',
+        '--test-type',
+        '--disable-setuid-sandbox',
         '--no-sandbox',
         '--disable-dev-shm-usage',
         '--start-fullscreen',
-        '--app=https://www.google.com/',
+        '--app=about:blank',
         `--window-size=${width},${height}`,
+        '--window-position=0,0',
+    ],
+    ignoreDefaultArgs: [
+        '--enable-automation',
     ],
 }
-options.executablePath = "/usr/bin/google-chrome"
+options.executablePath = "/usr/bin/chromium-browser"
 async function main() {
     let browser, page;
     try {
@@ -53,8 +58,9 @@ async function main() {
         page = pages[0]
 
         page.on('console', msg => {
-            var m = msg.text();
-            console.log('PAGE LOG:', m) // uncomment if you need
+            if(msg.type() == 'error') {
+                console.log('PAGE ERROR:', msg);
+            }
         });
 
         await page._client.send('Emulation.clearDeviceMetricsOverride')
@@ -90,12 +96,13 @@ async function main() {
         await page.waitForSelector('button[class=vjs-big-play-button]');
         await page.$eval('.bottom-content', element => element.style.display = "none");
         await page.$eval('.fullscreen-button', element => element.style.opacity = "0");
+        await page.$eval('.left', element => element.style.opacity = "0");
         await page.$eval('.right', element => element.style.opacity = "0");
         await page.$eval('.vjs-control-bar', element => element.style.opacity = "0");
         await page.click('button[class=vjs-big-play-button]', { waitUntil: 'domcontentloaded' });
 
         //  Start capturing screen with ffmpeg
-        const ls = child_process.spawn('sh', ['ffmpeg-cmd.sh', ' ',
+        var ls = child_process.spawn('sh', ['ffmpeg-cmd.sh', ' ',
             `${duration}`, ' ',
             `${exportname}`, ' ',
             `${disp_num}`
